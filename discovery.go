@@ -21,7 +21,7 @@ const (
 // getBroadcastAddrs returns all broadcast addresses for this machine's
 // network interfaces, plus the global broadcast 255.255.255.255.
 func getBroadcastAddrs() []string {
-	addrs := []string{"255.255.255.255"}
+	addrs := []string{"255.255.255.255", "127.0.0.1"}
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -147,6 +147,11 @@ func ListenDiscovery(pt *PeerTable, selfUsername string) {
 		peerUser := parts[0]
 		peerPort := parts[1]
 
+
+		/*fmt.Printf("[debug] received packet from %s:%s\n", peerUser, peerPort)
+        if peerUser == selfUsername {
+            continue
+        }*/
 		// Ignore our own broadcasts
 		if peerUser == selfUsername {
 			continue
