@@ -1,36 +1,36 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net"
 	"strings"
-	"syscall"
 	"time"
 )
 
 const (
 	// DiscoveryPort is the UDP port used for peer discovery.
 	DiscoveryPort = 9999
+	// MulticastGroup is the multicast address all peers join.
+	// 239.x.x.x is the "administratively scoped" range, safe for LAN use.
+	MulticastGroup = "239.0.0.1"
 	// BroadcastInterval is how often presence is advertised.
 	BroadcastInterval = 5 * time.Second
 	// DiscoveryPrefix is the protocol prefix for discovery packets.
 	DiscoveryPrefix = "DISCOVER:"
 )
 
-// BroadcastPresence sends a UDP broadcast every BroadcastInterval advertising
-// this peer's username and TCP port. It sends an initial burst of 3 packets
-// for faster discovery on startup.
+// BroadcastPresence sends a UDP multicast packet every BroadcastInterval
+// advertising this peer's username and TCP port.
 func BroadcastPresence(username, tcpPort string) {
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", DiscoveryPort))
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", MulticastGroup, DiscoveryPort))
 	if err != nil {
-		log.Fatalf("resolve broadcast addr: %v", err)
+		log.Fatalf("resolve multicast addr: %v", err)
 	}
 
 	conn, err := net.DialUDP("udp4", nil, addr)
 	if err != nil {
-		log.Fatalf("dial broadcast: %v", err)
+		log.Fatalf("dial multicast: %v", err)
 	}
 	defer conn.Close()
 
@@ -42,36 +42,38 @@ func BroadcastPresence(username, tcpPort string) {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	// Then broadcast at regular interval
+	// Then send at regular interval
 	for {
 		_, err := conn.Write([]byte(msg))
 		if err != nil {
-			log.Printf("broadcast error: %v", err)
+			log.Printf("multicast send error: %v", err)
 		}
 		time.Sleep(BroadcastInterval)
 	}
 }
 
-// ListenDiscovery listens for UDP discovery broadcasts and updates the peer table.
-// It uses SO_REUSEADDR so multiple processes on the same machine can share the port.
+// ListenDiscovery listens for UDP multicast discovery packets and updates
+// the peer table. Uses net.ListenMulticastUDP which is cross-platform and
+// handles SO_REUSEADDR internally.
 func ListenDiscovery(pt *PeerTable, selfUsername string) {
-	lc := net.ListenConfig{
-		Control: func(network, address string, c syscall.RawConn) error {
-			return c.Control(func(fd uintptr) {
-				syscall.SetsockoptInt(syscall.Handle(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-			})
-		},
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", MulticastGroup, DiscoveryPort))
+	if err != nil {
+		log.Fatalf("resolve multicast addr: %v", err)
 	}
 
-	pc, err := lc.ListenPacket(context.Background(), "udp4", fmt.Sprintf(":%d", DiscoveryPort))
+	// nil interface = join on all available interfaces
+	conn, err := net.ListenMulticastUDP("udp4", nil, addr)
 	if err != nil {
 		log.Fatalf("listen discovery: %v", err)
 	}
-	defer pc.Close()
+	defer conn.Close()
+
+	// Set a generous read buffer
+	conn.SetReadBuffer(1024)
 
 	buf := make([]byte, 1024)
 	for {
-		n, addr, err := pc.ReadFrom(buf)
+		n, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			log.Printf("discovery read error: %v", err)
 			continue
@@ -97,12 +99,7 @@ func ListenDiscovery(pt *PeerTable, selfUsername string) {
 			continue
 		}
 
-		// Extract IP from sender address
-		udpAddr, ok := addr.(*net.UDPAddr)
-		if !ok {
-			continue
-		}
-		peerIP := udpAddr.IP.String()
+		peerIP := remoteAddr.IP.String()
 
 		// Only log the first time we see this peer
 		existing := pt.Get(peerUser)
