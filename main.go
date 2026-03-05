@@ -11,6 +11,7 @@ import (
 
 func main() {
 	listen := flag.Bool("listen", false, "Start in listener mode (TCP server + UDP discovery)")
+	chat := flag.Bool("chat", false, "Start interactive chat mode")
 	username := flag.String("u", "", "Username (required for listen and send)")
 	message := flag.String("m", "", "Message to send to the target user")
 	filePath := flag.String("t", "", "File path to send to the target user")
@@ -34,6 +35,22 @@ func main() {
 			os.Exit(1)
 		}
 		runListenMode(*username, *port)
+		return
+	}
+
+	// --- Mode: Interactive chat ---
+	if *chat {
+		if *username == "" {
+			fmt.Println("Error: -u <username> is required in chat mode")
+			flag.Usage()
+			os.Exit(1)
+		}
+		if *targetIP == "" {
+			fmt.Println("Error: -ip <address> is required in chat mode")
+			flag.Usage()
+			os.Exit(1)
+		}
+		RunChat(*username, *targetIP, *port, *port)
 		return
 	}
 
