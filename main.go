@@ -15,6 +15,7 @@ func main() {
 	message := flag.String("m", "", "Message to send to the target user")
 	filePath := flag.String("t", "", "File path to send to the target user")
 	showUsers := flag.Bool("users", false, "Discover and show online users, then exit")
+	targetIP := flag.String("ip", "", "Direct IP address (skip discovery, use with -u)")
 	port := flag.String("port", "8080", "TCP port for the server (default 8080)")
 
 	flag.Parse()
@@ -49,24 +50,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	// We need to discover the target user's IP
-	peer := discoverPeer(*username)
-	if peer == nil {
-		fmt.Printf("Error: user '%s' not found on the network\n", *username)
-		os.Exit(1)
+	var peerIP, peerPort string
+
+	if *targetIP != "" {
+		// Direct IP mode — skip discovery
+		peerIP = *targetIP
+		peerPort = *port
+		fmt.Printf("[direct] connecting to %s:%s\n", peerIP, peerPort)
+	} else {
+		// Discovery mode
+		peer := discoverPeer(*username)
+		if peer == nil {
+			fmt.Printf("Error: user '%s' not found on the network\n", *username)
+			fmt.Println("Tip: use -ip <address> to connect directly")
+			os.Exit(1)
+		}
+		peerIP = peer.IP
+		peerPort = peer.Port
 	}
 
 	// Determine our own username from hostname
 	senderName := getSenderName()
 
 	if *message != "" {
-		if err := SendMessage(peer.IP, peer.Port, senderName, *message); err != nil {
+		if err := SendMessage(peerIP, peerPort, senderName, *message); err != nil {
 			log.Fatalf("send message failed: %v", err)
 		}
 	}
 
 	if *filePath != "" {
-		if err := SendFile(peer.IP, peer.Port, senderName, *filePath); err != nil {
+		if err := SendFile(peerIP, peerPort, senderName, *filePath); err != nil {
 			log.Fatalf("send file failed: %v", err)
 		}
 	}
