@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -93,7 +92,7 @@ func runListenMode(username, port string) {
 
 	// Block until Ctrl+C
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sig, os.Interrupt)
 	<-sig
 	fmt.Println("\n[gochat] shutting down")
 }
