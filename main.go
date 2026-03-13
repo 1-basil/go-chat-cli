@@ -106,6 +106,26 @@ func main() {
 func runListenMode(username, port string) {
 	pt := NewPeerTable()
 
+	fmt.Println(`
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃                                                       ┃
+  ┃    ░██████╗░░█████╗░░█████╗░██╗░░██╗░█████╗░████████╗ ┃
+  ┃    ██╔════╝░██╔══██╗██╔══██╗██║░░██║██╔══██╗╚══██╔══╝ ┃
+  ┃    ██║░░███╗██║░░██║██║░░╚═╝███████║███████║░░░██║░░░ ┃
+  ┃    ██║░░░██║██║░░██║██║░░██╗██╔══██║██╔══██║░░░██║░░░ ┃
+  ┃    ╚██████╔╝╚█████╔╝╚█████╔╝██║░░██║██║░░██║░░░██║░░░ ┃
+  ┃    ░╚═════╝░░╚════╝░░╚════╝░╚═╝░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░ ┃
+  ┃                 ░█████╗░██╗░░░░░██╗                    ┃
+  ┃                 ██╔══██╗██║░░░░░██║                    ┃
+  ┃                 ██║░░╚═╝██║░░░░░██║                    ┃
+  ┃                 ██║░░██╗██║░░░░░██║                    ┃
+  ┃                 ╚█████╔╝███████╗██║                    ┃
+  ┃                 ░╚════╝░╚══════╝╚═╝                    ┃
+  ┃─────────────────────────────────────────────────────── ┃
+  ┃       ⚡ P2P Chat & File Transfer on your LAN ⚡       ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+	`)
+
 	fmt.Printf("[gochat] starting as '%s' on TCP port %s\n", username, port)
 
 	go StartServer(port)
@@ -155,8 +175,9 @@ func discoverAndShowUsers() {
 
 	go ListenDiscovery(pt, "_lister_")
 
-	fmt.Println("[discovery] scanning network for 3 seconds...")
-	time.Sleep(3 * time.Second)
+	fmt.Println("[discovery] scanning network for 5 seconds...")
+	time.Sleep(5 * time.Second)
+	fmt.Println("[discovery] scan complete.")
 
 	pt.PrintAll()
 }

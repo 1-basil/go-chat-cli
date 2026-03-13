@@ -50,9 +50,17 @@ func getBroadcastAddrs() []string {
 			}
 
 			// Calculate directed broadcast: IP | ~Mask
+			mask := ipnet.Mask
+			if len(mask) == 16 {
+				mask = mask[12:]
+			}
+			if len(mask) != 4 {
+				continue
+			}
+
 			broadcast := make(net.IP, 4)
-			for i := range ip4 {
-				broadcast[i] = ip4[i] | ^ipnet.Mask[i]
+			for i := 0; i < 4; i++ {
+				broadcast[i] = ip4[i] | ^mask[i]
 			}
 			bcast := broadcast.String()
 			if bcast != "255.255.255.255" {
@@ -86,8 +94,9 @@ func BroadcastPresence(username, tcpPort string) {
 
 	fmt.Printf("[discovery] broadcasting to %d address(es)\n", len(targets))
 
-	// Use a single unconnected socket so we can send to multiple destinations
-	conn, err := net.ListenPacket("udp4", ":0")
+	// Use reuseListenConfig so we get SO_BROADCAST permission
+	lc := reuseListenConfig()
+	conn, err := lc.ListenPacket(context.Background(), "udp4", ":0")
 	if err != nil {
 		log.Fatalf("broadcast socket: %v", err)
 	}
@@ -95,7 +104,11 @@ func BroadcastPresence(username, tcpPort string) {
 
 	sendAll := func() {
 		for _, t := range targets {
-			conn.WriteTo(msg, t)
+			_, err := conn.WriteTo(msg, t)
+			if err != nil {
+				// Don't fatal, just log. Some interfaces might fail while others work.
+				log.Printf("[discovery] broadcast to %s failed: %v", t.String(), err)
+			}
 		}
 	}
 
@@ -119,7 +132,7 @@ func ListenDiscovery(pt *PeerTable, selfUsername string) {
 	lc := reuseListenConfig()
 	pc, err := lc.ListenPacket(context.Background(), "udp4", fmt.Sprintf(":%d", DiscoveryPort))
 	if err != nil {
-		log.Printf("[discovery] listen error (non-fatal): %v", err)
+		fmt.Printf("[discovery] FATAL: could not start discovery listener on port %d: %v\n", DiscoveryPort, err)
 		return
 	}
 	defer pc.Close()
@@ -147,11 +160,6 @@ func ListenDiscovery(pt *PeerTable, selfUsername string) {
 		peerUser := parts[0]
 		peerPort := parts[1]
 
-
-		/*fmt.Printf("[debug] received packet from %s:%s\n", peerUser, peerPort)
-        if peerUser == selfUsername {
-            continue
-        }*/
 		// Ignore our own broadcasts
 		if peerUser == selfUsername {
 			continue
